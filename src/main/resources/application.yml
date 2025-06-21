@@ -1,0 +1,11 @@
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+      database: ${MONGODB_DATABASE:library}
+      auto-index-creation: true
+
+server:
+  port: ${SERVER_PORT:8081}
+  servlet:
+    context-path: /mgmt

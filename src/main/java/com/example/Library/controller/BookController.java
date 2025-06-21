@@ -3,9 +3,12 @@ package com.example.Library.controller;
 import java.util.List;
 //import java.util.Optional;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 // import org.apache.catalina.User;
 import com.example.Library.model.User;
+
+import org.springframework.security.core.Authentication;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.example.Library.model.Book;
 import com.example.Library.service.BookService;
@@ -40,34 +44,53 @@ public class BookController {
     private UserService userService;
 
 
-    @GetMapping("/username/{userName}")
-    public ResponseEntity<List<Book>> getAllBooksOfUser(@PathVariable String userName){
-        User user = userService.getByUsername(userName);
-        List<Book> books = user.getBooks();
-        if(!books.isEmpty()){
-            return new ResponseEntity<>(books,HttpStatus.OK);
-        }else{
+    @GetMapping
+    public ResponseEntity<List<Book>> getAllBooksOfUser(){
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userName = authentication.getName();
+        Optional<User> userOptional = userService.getByUsername(userName);
+        if (userOptional.isPresent()) {
+            List<Book> books = userOptional.get().getBooks();
+            if(!books.isEmpty()){
+                return new ResponseEntity<>(books,HttpStatus.OK);
+            }else{
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+        } else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }  
+        }
     }
     
 
 
-
     @GetMapping("id/{id}")
     public ResponseEntity<Book> getBookById(@PathVariable ObjectId id){
-        Optional<Book> book = bookService.getByID(id);
-        if(book.isPresent()){
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userName = authentication.getName();
+        Optional<User> user = userService.getByUsername(userName);
+        List<Book> collect = user.isPresent() ? user.get().getBooks().stream().filter(x -> x.getId().equals(id)).collect(Collectors.toList()) : java.util.Collections.emptyList();
+
+        if(collect != null){
+             Optional<Book> book = bookService.getByID(id);
+
+             if(book.isPresent()){
             return new ResponseEntity<>(book.get(),HttpStatus.OK);
         }
-        else{
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+        
+       
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        
 
     }
-    @PostMapping("/save/{userName}")
-    public ResponseEntity<Book> saveNewBook(@RequestBody Book book,@PathVariable String userName){
+        
+
+
+    @PostMapping
+    public ResponseEntity<Book> saveNewBook(@RequestBody Book book){
        try{
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userName = authentication.getName();
         bookService.saveBook(book,userName);
         return new ResponseEntity<>(book,HttpStatus.CREATED);
        }catch(Exception e){
@@ -76,32 +99,20 @@ public class BookController {
     }
 
 
-    @GetMapping("/author/{author}")
-    public ResponseEntity<List<Book>> getbyAuthor(@PathVariable String author){
-        List<Book> books = bookService.getByAuth(author);
-        if(!books.isEmpty()){
-            return new ResponseEntity<>(books,HttpStatus.OK);
-        }else{
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    @GetMapping("/subject/{subject}")
-    public ResponseEntity<List<Book>> getBySubject(@PathVariable String subject){
-        List<Book> books = bookService.getBySub(subject);
-        if(!books.isEmpty()){
-            return new ResponseEntity<>(books,HttpStatus.OK);
-        }
-        else{
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-
-
-    @DeleteMapping("/delete/{userName}/{id}")
-    public ResponseEntity<?> deleteBook(@PathVariable ObjectId id,@PathVariable String userName){
-        bookService.deleteBookById(id,userName);
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<?> DeleteBook(@PathVariable ObjectId id){
+     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+     String username = authentication.getName();
+     Optional<Book> book = bookService.getByID(id);
+     if(book.isPresent()){
+        bookService.deleteBookById(id,username);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+     }else{
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+     }
     }
+   
+
+    
+
 }
